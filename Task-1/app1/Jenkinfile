@@ -1,0 +1,89 @@
+def appimage
+
+        
+pipeline{
+    agent {
+		label 'devopsrnd'
+	}
+    
+    environment {
+        SERVICE_NAME = "app1"
+        CONTAINER_NAME = "app1"
+        IMAGE_NAME="app2"
+        DOCKER_USERNAME= "shoeb0005"
+        VERSION_NUMBER="1.0.0"
+        registry= "shoeb0005/${IMAGE_NAME}"
+        BRANCH_NAME="main"
+        GIT_REPO="https://github.com/shoeb816/bs-devops.git"
+    }
+	
+    stages{
+        stage('SCM'){
+            steps{
+                git branch: "${env.BRANCH_NAME}",credentialsId: 'Gitlab-DevOps', url: "${env.GIT_REPO}" 
+            }
+        }
+
+        
+        stage('Build'){
+            steps{
+                script {
+                    appimage = docker.build("$env.registry")}
+            }
+        }
+        
+        stage('Push'){
+            environment {
+               registryCredential = 'SHOEB-Docker'
+           }
+           
+            steps{
+                script {
+                   docker.withRegistry( '', "$env.registryCredential" ) {
+                       appimage.push("$BUILD_ID")
+                       //appimage.push("$VERSION_NUMBER")
+                                   
+                   }
+               }
+            }
+        }
+        
+        stage('Cleaning up') { 
+
+			steps {
+				sh "docker rmi $env.registry:$BUILD_NUMBER"
+				//sh "docker rmi $env.registry:$VERSION_NUMBER"
+			}
+        }
+// Use One Deployment Stage of Kubernetes Deployment               
+        stage('Deploy to Kubernetes Cluster'){
+            steps{
+               //input message:"Proceed with final deployment?" 
+               sshPublisher(publishers: [sshPublisherDesc(configName: '{Host_Publish_over_SSH}', transfers: [sshTransfer(cleanRemote: false, excludes: '', 
+               execCommand: """kubectl apply -f php_deployment.yaml;""", 
+               execTimeout: 1220000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', 
+               remoteDirectory: '', remoteDirectorySDF: false, removePrefix: '', sourceFiles: 'app1/deploy/*.yaml')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: true)])
+			}
+        }
+        
+        stage('Deploy To Kubernetes Cluster') {
+            steps {
+                script{
+                    kubernetesDeploy configs: 'deploy/php_deployment.yaml', kubeconfigId: 'KUBERNETES-CLUSTER-LITE'
+                }
+            }
+        }
+                
+    }
+    
+    post {
+        failure {
+            echo 'Fail to Deploye!' 
+        }
+        success { 
+            echo 'Successfully Deployed!' 
+        } 
+    }
+    
+}
+

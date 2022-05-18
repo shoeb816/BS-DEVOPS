@@ -1,0 +1,19 @@
+version: '3.7'
+services:
+  app1:
+    image: app1
+    container_name: app1
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Dhaka
+    volumes:
+      - '../src/app1/:/var/www/'
+    build:
+      context: "./"
+      dockerfile: "Dockerfile"
+    
+    command: chmod -R 777 /var/www/storage/framework/ /var/www/storage/logs/   
+    ports:
+    - 9000:9000
+
+  
